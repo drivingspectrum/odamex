@@ -994,10 +994,12 @@ EXTERN_CVAR (vid_defwidth)
 EXTERN_CVAR (vid_defheight)
 EXTERN_CVAR (vid_widescreen)
 EXTERN_CVAR (vid_maxfps)
+EXTERN_CVAR (vid_vsync)
 
 EXTERN_CVAR (vid_overscan)
 EXTERN_CVAR (vid_fullscreen)
 EXTERN_CVAR (vid_32bpp)
+EXTERN_CVAR (vid_displayfps)
 
 static value_t VidFPSCaps[] = {
 	{ 35.0,		"35fps" },
@@ -1008,32 +1010,33 @@ static value_t VidFPSCaps[] = {
 };
 
 static int VMSize;
-static value_t *VidModes;
+static value_t *VidModes = NULL;
 
 EXTERN_CVAR(vid_currres)
 
 static menuitem_t ModesItems[] = {
-	{ bricktext, "Adjust Video Options",    {NULL},               {0.0}, {0.0}, {0.0}, {NULL}},
-	{ discrete, "Video Resolution",			{&vid_currres},        	{0.0}, {0.0},	{0.0}, {NULL} },
+	{ discrete, "Video Resolution",     {&vid_currres}, {0.0}, {0.0}, {0.0}, {NULL} },
+    { whitetext, "Press enter to set resolution", {NULL}, {0.0}, {0.0}, {0.0}, {NULL} },
+    { whitetext, " ",                   {NULL},         {0.0}, {0.0}, {0.0}, {NULL} },
+	{ bricktext, "Adjust Video Options",{NULL},         {0.0}, {0.0}, {0.0}, {NULL} },
 #ifdef _XBOX
 	{ slider, "Overscan",				{&vid_overscan},		{0.84375}, {1.0}, {0.03125}, {NULL} },
 #else
 	{ discrete, "Fullscreen",			{&vid_fullscreen},		{2.0}, {0.0},	{0.0}, {YesNo} },
 #endif
-	{ discrete, "32-bit color",			{&vid_32bpp},			{2.0}, {0.0},	{0.0}, {YesNo} },
-	{ discrete,	"Widescreen",			{&vid_widescreen},		{2.0}, {0.0},	{0.0}, {YesNo} } ,
+    { discrete, "Vertical Sync",		{&vid_vsync},			{2.0}, {0.0},	{0.0}, {YesNo} },
 	{ discrete, "Framerate",			{&vid_maxfps},			{5.0}, {0.0},	{0.0}, {VidFPSCaps} },
-	{ redtext,	" ",					{NULL},					{0.0}, {0.0},	{0.0}, {NULL} },
-	{ whitetext,"Press enter to activate changes",	{NULL},		{0.0}, {0.0},	{0.0}, {NULL} },
+	{ discrete,	"Widescreen",			{&vid_widescreen},		{2.0}, {0.0},	{0.0}, {YesNo} },
+	{ discrete, "32-bit color",			{&vid_32bpp},			{2.0}, {0.0},	{0.0}, {YesNo} },
+	{ discrete, "Display FPS",			{&vid_displayfps},		{2.0}, {0.0},	{0.0}, {YesNo} },
 };
 
-#define VM_VIDLINE      1
-//#define VM_ENTERLINE	0
-
+// Position in the menu of the "Video Resolution" line
+#define VM_VIDLINE      0
 
 menu_t ModesMenu = {
 	"M_VIDMOD",
-	1,
+	0,
 	STACKARRAY_LENGTH(ModesItems),
 	0,
 	ModesItems,
@@ -1041,6 +1044,10 @@ menu_t ModesMenu = {
 	0,
 	NULL
 };
+
+// The maximum size of the video mode string for the video mode menu, the code
+// below adds +1 for the null terminator
+#define BML_STRSIZE 32
 
 static void BuildModesList(int hiwidth, int hiheight)
 {
@@ -1082,11 +1089,13 @@ static void BuildModesList(int hiwidth, int hiheight)
     // Fill the mode list for our scroll left/right widget
     for (; mode_it != menumodelist.end(); ++i, ++mode_it)
     {
-        VidModes[i].name = (char *)M_Calloc(1,32);
+        VidModes[i].name = (char *)M_Calloc(1, BML_STRSIZE + 1);
 
-        snprintf((char*)VidModes[i].name, 32, "%dx%d", mode_it->first, 
+        snprintf((char*)VidModes[i].name, BML_STRSIZE + 1, "%dx%d", mode_it->first, 
                  mode_it->second);
 
+        // Give the resolution an integer value, it isn't used anywhere but
+        // I'm just making sure our "awesome" menu code doesn't have a fit
         VidModes[i].value = static_cast<float>(i);
     }
     
@@ -1094,11 +1103,10 @@ static void BuildModesList(int hiwidth, int hiheight)
     // the modes array
     ModesItems[VM_VIDLINE].b.leftval = (int)i;
     VMSize = i;
-
 }
 
-// An ugly function for splitting out the width and height components of a video
-// mode
+// An ugly function for getting the width and height components of the video 
+// menus temporary cvar 
 static bool GetSelectedSize(int* width, int* height)
 {
 	const char* resolution_str = VidModes[(int)vid_currres].name;
@@ -1926,7 +1934,7 @@ void M_OptResponder (event_t *ev)
 		case KEY_JOY1:
 		case KEY_ENTER:
 			// Sets the selected resolution in the video mode menu
-			if (CurrentMenu == &ModesMenu)
+			if (CurrentMenu == &ModesMenu && item == &ModesItems[VM_VIDLINE])
 			{
 				int width, height;
                 
