@@ -988,10 +988,7 @@ menu_t AutomapMenu = {
  *
  *=======================================*/
 
-QWORD testingmode;		// Holds time to revert to old mode
 int OldWidth, OldHeight;
-
-static bool GetSelectedSize(int line, int *width, int *height);
 
 EXTERN_CVAR (vid_defwidth)
 EXTERN_CVAR (vid_defheight)
@@ -1002,19 +999,6 @@ EXTERN_CVAR (vid_overscan)
 EXTERN_CVAR (vid_fullscreen)
 EXTERN_CVAR (vid_32bpp)
 
-static value_t Depths[22];
-
-#ifdef _XBOX
-static const char VMEnterText[] = "Press A to set mode";
-static const char VMTestText[] = "Press X to test mode for 5 seconds";
-#else
-static const char VMEnterText[] = "Press ENTER to set mode";
-static const char VMTestText[] = "Press T to test mode for 5 seconds";
-#endif
-
-static const char VMTestWaitText[] = "Please wait 5 seconds...";
-static const char VMTestBlankText[] = " ";
-
 static value_t VidFPSCaps[] = {
 	{ 35.0,		"35fps" },
 	{ 60.0,		"60fps" },
@@ -1023,7 +1007,14 @@ static value_t VidFPSCaps[] = {
 	{ 0.0,		"Unlimited" }
 };
 
+static int VMSize;
+static value_t *VidModes;
+
+EXTERN_CVAR(vid_currres)
+
 static menuitem_t ModesItems[] = {
+	{ bricktext, "Adjust Video Options",    {NULL},               {0.0}, {0.0}, {0.0}, {NULL}},
+	{ discrete, "Video Resolution",			{&vid_currres},        	{0.0}, {0.0},	{0.0}, {NULL} },
 #ifdef _XBOX
 	{ slider, "Overscan",				{&vid_overscan},		{0.84375}, {1.0}, {0.03125}, {NULL} },
 #else
@@ -1033,31 +1024,18 @@ static menuitem_t ModesItems[] = {
 	{ discrete,	"Widescreen",			{&vid_widescreen},		{2.0}, {0.0},	{0.0}, {YesNo} } ,
 	{ discrete, "Framerate",			{&vid_maxfps},			{5.0}, {0.0},	{0.0}, {VidFPSCaps} },
 	{ redtext,	" ",					{NULL},					{0.0}, {0.0},	{0.0}, {NULL} },
-	{ screenres, NULL,					{NULL},					{0.0}, {0.0},	{0.0}, {NULL} },
-	{ screenres, NULL,					{NULL},					{0.0}, {0.0},	{0.0}, {NULL} },
-	{ screenres, NULL,					{NULL},					{0.0}, {0.0},	{0.0}, {NULL} },
-	{ screenres, NULL,					{NULL},					{0.0}, {0.0},	{0.0}, {NULL} },
-	{ screenres, NULL,					{NULL},					{0.0}, {0.0},	{0.0}, {NULL} },
-	{ screenres, NULL,					{NULL},					{0.0}, {0.0},	{0.0}, {NULL} },
-	{ screenres, NULL,					{NULL},					{0.0}, {0.0},	{0.0}, {NULL} },
-	{ screenres, NULL,					{NULL},					{0.0}, {0.0},	{0.0}, {NULL} },
-	{ screenres, NULL,					{NULL},					{0.0}, {0.0},	{0.0}, {NULL} },
-	{ whitetext, " ",					{NULL},					{0.0}, {0.0},	{0.0}, {NULL} },
-	{ redtext,	" ",					{NULL},					{0.0}, {0.0},	{0.0}, {NULL} },
-	{ bricktext, " ",					{NULL},					{0.0}, {0.0},	{0.0}, {NULL} },
-	{ redtext,	" ",					{NULL},					{0.0}, {0.0},	{0.0}, {NULL} }
+	{ whitetext,"Press enter to activate changes",	{NULL},		{0.0}, {0.0},	{0.0}, {NULL} },
 };
 
-#define VM_DEPTHITEM	0
-#define VM_RESSTART		5
-#define VM_ENTERLINE	14
-#define VM_TESTLINE		16
+#define VM_VIDLINE      1
+//#define VM_ENTERLINE	0
+
 
 menu_t ModesMenu = {
 	"M_VIDMOD",
-	0,
+	1,
 	STACKARRAY_LENGTH(ModesItems),
-	130,
+	0,
 	ModesItems,
 	0,
 	0,
@@ -1066,6 +1044,7 @@ menu_t ModesMenu = {
 
 static void BuildModesList(int hiwidth, int hiheight)
 {
+
 	// gathers a list of unique resolutions availible for the current
 	// screen mode (windowed or fullscreen)
 	bool fullscreen = I_GetWindow()->getVideoMode()->isFullScreen();
@@ -1077,68 +1056,52 @@ static void BuildModesList(int hiwidth, int hiheight)
 	for (IVideoModeList::const_iterator it = videomodelist->begin(); it != videomodelist->end(); ++it)
 		if (it->isFullScreen() == fullscreen)
 			menumodelist.push_back(std::make_pair(it->getWidth(), it->getHeight()));
+
 	menumodelist.erase(std::unique(menumodelist.begin(), menumodelist.end()), menumodelist.end());
 
 	MenuModeList::const_iterator mode_it = menumodelist.begin();
 
-    const char** str = NULL;
+	// Clear all previously allocated video mode strings (ugh)
+    if (VidModes)
+    {
+        for (int i = 0; i < VMSize; ++i)
+        {
+            M_Free(VidModes[i].name);
+        }
+    }
 
-	for (int i = VM_RESSTART; ModesItems[i].type == screenres; i++)
-	{
-		ModesItems[i].e.highlight = -1;
-		for (int col = 0; col < 3; col++)
-		{
-			if (col == 0)
-				str = &ModesItems[i].b.res1;
-			else if (col == 1)
-				str = &ModesItems[i].c.res2;
-			else if (col == 2)
-				str = &ModesItems[i].d.res3;
+    // (Re)allocate the mode list
+    size_t vmsSize = (menumodelist.size() * sizeof(value_t));
+    VidModes = (value_t *)M_Realloc(VidModes, vmsSize);
+    
+    // Set the mode list pointer to the values
+    ModesItems[VM_VIDLINE].e.values = VidModes;
+        
+    int i = 0;
+    
+    // Fill the mode list for our scroll left/right widget
+    for (; mode_it != menumodelist.end(); ++i, ++mode_it)
+    {
+        VidModes[i].name = (char *)M_Calloc(1,32);
 
-			if (mode_it != menumodelist.end())
-			{
-				int width = mode_it->first;
-				int height = mode_it->second;
-				++mode_it;
+        snprintf((char*)VidModes[i].name, 32, "%dx%d", mode_it->first, 
+                 mode_it->second);
 
-				if (width == hiwidth && height == hiheight)
-					ModesItems[i].e.highlight = ModesItems[i].a.selmode = col;
+        VidModes[i].value = static_cast<float>(i);
+    }
+    
+    // Set the number of video modes for the menu system and record the size of
+    // the modes array
+    ModesItems[VM_VIDLINE].b.leftval = (int)i;
+    VMSize = i;
 
-				char strtemp[32];
-				sprintf(strtemp, "%dx%d", width, height);
-				ReplaceString(str, strtemp);
-			}
-			else
-			{
-				*str = NULL;
-			}
-		}
-	}
 }
 
-void M_RefreshModesList()
+// An ugly function for splitting out the width and height components of a video
+// mode
+static bool GetSelectedSize(int* width, int* height)
 {
-	BuildModesList(I_GetVideoWidth(), I_GetVideoHeight());
-}
-
-static bool GetSelectedSize(int line, int* width, int* height)
-{
-	if (ModesItems[line].type != screenres)
-		return false;
-
-	int mode_num = (line - VM_RESSTART) * 3 + ModesItems[line].a.selmode;
-
-	const char* resolution_str = NULL;
-
-	if (mode_num % 3 == 0)
-		resolution_str = ModesItems[line].b.res1;
-	else if (mode_num % 3 == 1)
-		resolution_str = ModesItems[line].c.res2;
-	else if (mode_num % 3 == 2)
-		resolution_str = ModesItems[line].d.res3;
-
-	if (!resolution_str)
-		return false;
+	const char* resolution_str = VidModes[(int)vid_currres].name;
 
 	size_t xpos = 0;
 	for (const char* s = resolution_str; s; s++, xpos++)
@@ -1157,53 +1120,13 @@ static bool GetSelectedSize(int line, int* width, int* height)
 
 static void SetModesMenu(int w, int h)
 {
-	if (!testingmode)
-	{
-		ModesItems[VM_ENTERLINE].label = VMEnterText;
-		ModesItems[VM_TESTLINE].label = VMTestText;
-	}
-	else
-	{
-		static char enter_text[64];
-		sprintf(enter_text, "TESTING %dx%d", w, h);
-
-		ModesItems[VM_ENTERLINE].label = enter_text;
-		ModesItems[VM_TESTLINE].label = VMTestWaitText;
-	}
-
 	BuildModesList(w, h);
-}
-
-//
-// M_ModeFlashTestText
-//
-// Flashes the video mode testing text
-//
-void M_ModeFlashTestText()
-{
-    if (ModesItems[VM_TESTLINE].label[0] == ' ')
-		ModesItems[VM_TESTLINE].label = VMTestWaitText;
-	else
-		ModesItems[VM_TESTLINE].label = VMTestBlankText;
-}
-
-void M_RestoreMode (void)
-{
-	V_SetResolution(OldWidth, OldHeight);
-	testingmode = 0;
-
-	SetModesMenu(OldWidth, OldHeight);
 }
 
 static void SetVidMode()
 {
 	SetModesMenu(I_GetVideoWidth(), I_GetVideoHeight());
 
-	if (ModesMenu.items[ModesMenu.lastOn].type == screenres)
-	{
-		if (ModesMenu.items[ModesMenu.lastOn].a.selmode == -1)
-			ModesMenu.items[ModesMenu.lastOn].a.selmode++;
-	}
 	M_SwitchMenu(&ModesMenu);
 }
 
@@ -1250,12 +1173,6 @@ static void M_SlideUIBlue (int val)
 
 void M_OptInit (void)
 {
-	for (int i = 0; i < 22; i++)
-	{
-		Depths[i].value = i;
-		Depths[i].name = NULL;
-	}
-
 	switch (I_GetVideoCapabilities()->getDisplayType())
 	{
 	case DISPLAY_FullscreenOnly:
@@ -1447,41 +1364,6 @@ void M_OptDrawer (void)
 
 		item = CurrentMenu->items + i;
 
-		if (item->type == screenres)
-		{
-			const char *str = NULL;
-
-			for (x = 0; x < 3; x++)
-			{
-				switch (x)
-				{
-				case 0:
-					str = item->b.res1;
-					break;
-				case 1:
-					str = item->c.res2;
-					break;
-				case 2:
-					str = item->d.res3;
-					break;
-				}
-				if (str)
-				{
-					if (x == item->e.highlight)
-						color = CR_GREY;
-					else
-						color = CR_RED;
-
-					screen->DrawTextCleanMove (color, 104 * x + 20, y, str);
-				}
-			}
-
-			if (i == CurrentItem && ((item->a.selmode != -1 && (skullAnimCounter < 6 || WaitingForKey))
-				|| WaitingForAxis || testingmode))
-				screen->DrawPatchClean (W_CachePatch ("LITLCURS"), item->a.selmode * 104 + 8, y);
-		}
-		else
-		{
 			width = V_StringWidth (item->label);
 			switch (item->type)
 			{
@@ -1634,7 +1516,6 @@ void M_OptDrawer (void)
 				screen->DrawPatchClean (W_CachePatch ("LITLCURS"), CurrentMenu->indent + 3, y);
 			}
 		}
-	}
 
 	VisBottom = i - 1;
 	CanScrollUp = (CurrentMenu->scrollpos != 0);
@@ -1748,18 +1629,6 @@ void M_OptResponder (event_t *ev)
 		case KEY_HAT3:
 		case KEY_DOWNARROW:
 			{
-				int modecol;
-
-				if (item->type == screenres)
-				{
-					modecol = item->a.selmode;
-					item->a.selmode = -1;
-				}
-				else
-				{
-					modecol = 0;
-				}
-
 				do
 				{
 					CurrentItem++;
@@ -1775,12 +1644,7 @@ void M_OptResponder (event_t *ev)
 					}
 				} while (CurrentMenu->items[CurrentItem].type == redtext ||
 						 CurrentMenu->items[CurrentItem].type == whitetext ||
-						 CurrentMenu->items[CurrentItem].type == bricktext ||
-						 (CurrentMenu->items[CurrentItem].type == screenres &&
-						  !CurrentMenu->items[CurrentItem].b.res1));
-
-				if (CurrentMenu->items[CurrentItem].type == screenres)
-					CurrentMenu->items[CurrentItem].a.selmode = modecol;
+						 CurrentMenu->items[CurrentItem].type == bricktext);
 
 				S_Sound (CHAN_INTERFACE, "plats/pt1_stop", 1, ATTN_NONE);
 			}
@@ -1789,18 +1653,6 @@ void M_OptResponder (event_t *ev)
 		case KEY_HAT1:
 		case KEY_UPARROW:
 			{
-				int modecol;
-
-				if (item->type == screenres)
-				{
-					modecol = item->a.selmode;
-					item->a.selmode = -1;
-				}
-				else
-				{
-					modecol = 0;
-				}
-
 				do
 				{
 					CurrentItem--;
@@ -1818,12 +1670,7 @@ void M_OptResponder (event_t *ev)
 					}
 				} while (CurrentMenu->items[CurrentItem].type == redtext ||
 						 CurrentMenu->items[CurrentItem].type == whitetext ||
-						 CurrentMenu->items[CurrentItem].type == bricktext ||
-						 (CurrentMenu->items[CurrentItem].type == screenres &&
-						  !CurrentMenu->items[CurrentItem].b.res1));
-
-				if (CurrentMenu->items[CurrentItem].type == screenres)
-					CurrentMenu->items[CurrentItem].a.selmode = modecol;
+						 CurrentMenu->items[CurrentItem].type == bricktext);
 
 				S_Sound (CHAN_INTERFACE, "plats/pt1_stop", 1, ATTN_NONE);
 			}
@@ -1841,9 +1688,7 @@ void M_OptResponder (event_t *ev)
 					CurrentItem = CurrentMenu->scrolltop + CurrentMenu->scrollpos + 1;
 					while (CurrentMenu->items[CurrentItem].type == redtext ||
 						   CurrentMenu->items[CurrentItem].type == whitetext ||
-						   CurrentMenu->items[CurrentItem].type == bricktext ||
-						   (CurrentMenu->items[CurrentItem].type == screenres &&
-							!CurrentMenu->items[CurrentItem].b.res1))
+						   CurrentMenu->items[CurrentItem].type == bricktext)
 					{
 						++CurrentItem;
 					}
@@ -1865,9 +1710,7 @@ void M_OptResponder (event_t *ev)
 					CurrentItem = CurrentMenu->scrolltop + CurrentMenu->scrollpos + 1;
 					while (CurrentMenu->items[CurrentItem].type == redtext ||
 						   CurrentMenu->items[CurrentItem].type == whitetext ||
-						   CurrentMenu->items[CurrentItem].type == bricktext ||
-						   (CurrentMenu->items[CurrentItem].type == screenres &&
-							!CurrentMenu->items[CurrentItem].b.res1))
+						   CurrentMenu->items[CurrentItem].type == bricktext)
 					{
 						++CurrentItem;
 					}
@@ -1949,36 +1792,8 @@ void M_OptResponder (event_t *ev)
 							cur = numvals - 1;
 
 						item->a.cvar->Set (item->e.values[cur].value);
-
-						// Hack hack. Rebuild list of resolutions
-						if (item->e.values == Depths)
-							BuildModesList(I_GetVideoWidth(), I_GetVideoHeight());
 					}
 					S_Sound (CHAN_INTERFACE, "plats/pt1_mid", 1, ATTN_NONE);
-					break;
-
-				case screenres:
-					{
-						int col;
-
-						col = item->a.selmode - 1;
-						if (col < 0)
-						{
-							if (CurrentItem > 0)
-							{
-								if (CurrentMenu->items[CurrentItem - 1].type == screenres)
-								{
-									item->a.selmode = -1;
-									CurrentMenu->items[--CurrentItem].a.selmode = 2;
-								}
-							}
-						}
-						else
-						{
-							item->a.selmode = col;
-						}
-					}
-					S_Sound (CHAN_INTERFACE, "plats/pt1_stop", 1, ATTN_NONE);
 					break;
 
 				case joyactive:
@@ -2073,39 +1888,8 @@ void M_OptResponder (event_t *ev)
 							cur = 0;
 
 						item->a.cvar->Set (item->e.values[cur].value);
-
-						// Hack hack. Rebuild list of resolutions
-						if (item->e.values == Depths)
-							BuildModesList(I_GetVideoWidth(), I_GetVideoHeight());
 					}
 					S_Sound (CHAN_INTERFACE, "plats/pt1_mid", 1, ATTN_NONE);
-					break;
-
-				case screenres:
-					{
-						int col;
-
-						col = item->a.selmode + 1;
-						if ((col > 2) || (col == 2 && !item->d.res3) || (col == 1 && !item->c.res2))
-						{
-							if (CurrentMenu->numitems - 1 > CurrentItem)
-							{
-								if (CurrentMenu->items[CurrentItem + 1].type == screenres)
-								{
-									if (CurrentMenu->items[CurrentItem + 1].b.res1)
-									{
-										item->a.selmode = -1;
-										CurrentMenu->items[++CurrentItem].a.selmode = 0;
-									}
-								}
-							}
-						}
-						else
-						{
-							item->a.selmode = col;
-						}
-					}
-					S_Sound (CHAN_INTERFACE, "plats/pt1_stop", 1, ATTN_NONE);
 					break;
 
 				case joyactive:
@@ -2141,11 +1925,12 @@ void M_OptResponder (event_t *ev)
 
 		case KEY_JOY1:
 		case KEY_ENTER:
+			// Sets the selected resolution in the video mode menu
 			if (CurrentMenu == &ModesMenu)
 			{
 				int width, height;
-
-				if (!(item->type == screenres && GetSelectedSize(CurrentItem, &width, &height)))
+                
+				if (!GetSelectedSize(&width, &height))
 				{
 					width = I_GetVideoWidth();
 					height = I_GetVideoHeight();
@@ -2176,10 +1961,6 @@ void M_OptResponder (event_t *ev)
 
 				item->a.cvar->Set (item->e.values[cur].value);
 
-				// Hack hack. Rebuild list of resolutions
-				if (item->e.values == Depths)
-					BuildModesList(I_GetVideoWidth(), I_GetVideoHeight());
-
 				S_Sound (CHAN_INTERFACE, "plats/pt1_mid", 1, ATTN_NONE);
 			}
 			else if (item->type == control)
@@ -2205,9 +1986,6 @@ void M_OptResponder (event_t *ev)
 				CurrentMenu->items[8].label = "Activate desired analog axis or ESC to cancel";
 				CurrentMenu->items[8].type = redtext;
 			}
-			else if (item->type == screenres)
-			{
-			}
 			break;
 
 		case KEY_JOY2:
@@ -2217,34 +1995,6 @@ void M_OptResponder (event_t *ev)
 			break;
 
 		default:
-#ifdef _XBOX
-			if (ev->data2 == 't' || ev->data2 == KEY_JOY3)
-#else
-			if (ev->data2 == 't')
-#endif
-			{
-				// Test selected resolution
-				if (CurrentMenu == &ModesMenu)
-				{
-					int width, height;
-
-					if (!(item->type == screenres && GetSelectedSize(CurrentItem, &width, &height)))
-					{
-						width = I_GetVideoWidth();
-						height = I_GetVideoHeight();
-					}
-
-					OldWidth = I_GetVideoWidth();
-					OldHeight = I_GetVideoHeight();
-
-					V_SetResolution(width, height);
-
-					testingmode = I_MSTime() * TICRATE / 1000 + 5 * TICRATE;
-					SetModesMenu(width, height);
-
-					S_Sound (CHAN_INTERFACE, "weapons/pistol", 1, ATTN_NONE);
-				}
-			}
 			break;
 	}
 

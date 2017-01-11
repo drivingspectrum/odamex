@@ -701,7 +701,9 @@ CVAR_RANGE_FUNC_DECL(screenblocks, "10", "Selects the size of the visible window
 
 CVAR_RANGE_FUNC_DECL(vid_overscan, "1.0", "Overscan matting (as a percentage of the screen area)",
 				CVARTYPE_FLOAT, CVAR_CLIENTARCHIVE | CVAR_NOENABLEDISABLE, 0.5f, 1.0f)
-
+				
+CVAR(			vid_currres, "0", "Menu resolution hack, do not change",
+				CVARTYPE_STRING, CVAR_CLIENTARCHIVE | CVAR_NOENABLEDISABLE)
 
 VERSION_CONTROL (cl_cvarlist_cpp, "$Id$")
 

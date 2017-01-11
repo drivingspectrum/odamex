@@ -78,9 +78,6 @@ void M_SwitchMenu (struct menu_s *menu);
 
 void M_PopMenuStack (void);
 
-// [RH] Called whenever the display mode changes
-void M_RefreshModesList ();
-
 //
 // MENU TYPEDEFS
 //
@@ -96,7 +93,6 @@ typedef enum {
 	discrete,
 	cdiscrete,
 	control,
-	screenres,
 	bitflag,
 	listelement,
 	joyactive,

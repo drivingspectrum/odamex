@@ -109,7 +109,6 @@ void D_DoAdvanceDemo (void);
 
 void D_DoomLoop (void);
 
-extern QWORD testingmode;
 extern BOOL gameisdead;
 extern BOOL demorecording;
 extern bool M_DemoNoPlay;	// [RH] if true, then skip any demos in the loop
@@ -156,9 +155,6 @@ EXTERN_CVAR (vid_vsync)
 
 const char *LOG_FILE;
 
-void M_RestoreMode (void);
-void M_ModeFlashTestText (void);
-
 //
 // D_ProcessEvents
 // Send all the events of the given timestamp down the responder chain
@@ -166,17 +162,6 @@ void M_ModeFlashTestText (void);
 void D_ProcessEvents (void)
 {
 	event_t *ev;
-
-	// [RH] If testing mode, do not accept input until test is over
-	if (testingmode)
-	{
-		if (testingmode <= I_MSTime() * TICRATE / 1000)
-			M_RestoreMode ();
-		else
-			M_ModeFlashTestText();
-
-		return;
-	}
 
 	for (; eventtail != eventhead ; eventtail = ++eventtail<MAXEVENTS ? eventtail : 0)
 	{
