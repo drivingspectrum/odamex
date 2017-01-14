@@ -1035,7 +1035,7 @@ static menuitem_t ModesItems[] = {
 	{ discrete, "Framerate",			{&vid_maxfps},			{5.0}, {0.0},	{0.0}, {VidFPSCaps} },
 	{ discrete,	"Widescreen",			{&vid_widescreen},		{2.0}, {0.0},	{0.0}, {YesNo} },
 	{ discrete, "32-bit color",			{&vid_32bpp},			{2.0}, {0.0},	{0.0}, {YesNo} },
-	{ discrete, "Screenres Emulation",	{&vid_scremu},			{3.0}, {0.0},	{0.0}, {VidScrEmu} },
+	{ discrete, "Mode Emulation",    	{&vid_scremu},			{3.0}, {0.0},	{0.0}, {VidScrEmu} },
 	{ discrete, "Display FPS",			{&vid_displayfps},		{2.0}, {0.0},	{0.0}, {YesNo} },
 };
 
@@ -1131,7 +1131,7 @@ static bool GetSelectedSize(int* width, int* height)
 	const char* resolution_str;
     int cur = (int)vid_currres;
 	
-	if (cur > 0 && cur < VMSize)
+	if (cur >= 0 && cur < VMSize)
         resolution_str = VidModes[cur].name;
     else
         resolution_str = "";
