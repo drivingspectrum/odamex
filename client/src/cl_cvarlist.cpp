@@ -685,12 +685,15 @@ CVAR_FUNC_DECL(	vid_fullscreen, "0", "Full screen video mode",
 CVAR_FUNC_DECL(	vid_32bpp, "0", "Enable 32-bit color rendering",
 				CVARTYPE_BOOL, CVAR_CLIENTARCHIVE)
 
-CVAR_FUNC_DECL(	vid_320x200, "0", "Enable 320x200 video emulation",
+CVAR_FUNC_DECL(	vid_320x200, "0", "(DEPRECATED, use vid_scremu instead) Enable 320x200 video emulation",
 				CVARTYPE_BOOL, CVAR_CLIENTARCHIVE)
 
-CVAR_FUNC_DECL(	vid_640x400, "0", "Enable 640x400 video emulation",
+CVAR_FUNC_DECL(	vid_640x400, "0", "(DEPRECATED, use vid_scremu instead) Enable 640x400 video emulation",
 				CVARTYPE_BOOL, CVAR_CLIENTARCHIVE)
 
+CVAR_FUNC_DECL(	vid_scremu, "0", "Screenres emulation (0 - none, 1 - 320x200, 2 - 640x400)",
+				CVARTYPE_INT, CVAR_CLIENTARCHIVE | CVAR_NOENABLEDISABLE)
+				
 // Optimize rendering functions based on CPU vectorization support
 // Can be of "detect" or "none" or "mmx","sse2","altivec" depending on availability; case-insensitive.
 CVAR_FUNC_DECL(	r_optimize, "detect", "Rendering optimizations",
@@ -703,7 +706,7 @@ CVAR_RANGE_FUNC_DECL(vid_overscan, "1.0", "Overscan matting (as a percentage of 
 				CVARTYPE_FLOAT, CVAR_CLIENTARCHIVE | CVAR_NOENABLEDISABLE, 0.5f, 1.0f)
 				
 CVAR(			vid_currres, "0", "Menu resolution hack, do not change",
-				CVARTYPE_STRING, CVAR_CLIENTARCHIVE | CVAR_NOENABLEDISABLE)
+				CVARTYPE_STRING, CVAR_UNSETTABLE | CVAR_NOENABLEDISABLE)
 
 VERSION_CONTROL (cl_cvarlist_cpp, "$Id$")
 

@@ -184,6 +184,37 @@ CVAR_FUNC_IMPL(vid_640x400)
         V_ForceVideoModeAdjustment();
 }
 
+CVAR_FUNC_IMPL(vid_scremu)
+{  
+    switch ((int)var)
+    {
+    // none
+    case 0:
+        {
+            vid_320x200.ForceSet(0.0f);
+            vid_640x400.ForceSet(0.0f);
+        }
+        break;
+    // 320x200
+    case 1:
+        {
+            vid_320x200.ForceSet(1.0f);
+            vid_640x400.ForceSet(0.0f);
+        }
+        break;
+    // 640x400
+    case 2:
+        {
+            vid_320x200.ForceSet(0.0f);
+            vid_640x400.ForceSet(1.0f);
+        }
+        break;
+    // unknown
+    default:
+        break;
+    }
+}
+
 
 CVAR_FUNC_IMPL (vid_widescreen)
 {

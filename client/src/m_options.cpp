@@ -1000,6 +1000,7 @@ EXTERN_CVAR (vid_overscan)
 EXTERN_CVAR (vid_fullscreen)
 EXTERN_CVAR (vid_32bpp)
 EXTERN_CVAR (vid_displayfps)
+EXTERN_CVAR (vid_scremu)
 
 static value_t VidFPSCaps[] = {
 	{ 35.0,		"35fps" },
@@ -1007,6 +1008,12 @@ static value_t VidFPSCaps[] = {
 	{ 70.0,		"70fps" },
 	{ 120.0,	"120fps" },
 	{ 0.0,		"Unlimited" }
+};
+
+static value_t VidScrEmu[] = {
+	{ 0.0,		"None" },
+	{ 1.0,		"320x200" },
+	{ 2.0,		"640x400" },
 };
 
 static int VMSize;
@@ -1028,6 +1035,7 @@ static menuitem_t ModesItems[] = {
 	{ discrete, "Framerate",			{&vid_maxfps},			{5.0}, {0.0},	{0.0}, {VidFPSCaps} },
 	{ discrete,	"Widescreen",			{&vid_widescreen},		{2.0}, {0.0},	{0.0}, {YesNo} },
 	{ discrete, "32-bit color",			{&vid_32bpp},			{2.0}, {0.0},	{0.0}, {YesNo} },
+	{ discrete, "Screenres Emulation",	{&vid_scremu},			{3.0}, {0.0},	{0.0}, {VidScrEmu} },
 	{ discrete, "Display FPS",			{&vid_displayfps},		{2.0}, {0.0},	{0.0}, {YesNo} },
 };
 
@@ -1045,12 +1053,16 @@ menu_t ModesMenu = {
 	NULL
 };
 
+int M_FindCurName (char *cur, value_t *values, int numvals);
+
 // The maximum size of the video mode string for the video mode menu, the code
 // below adds +1 for the null terminator
 #define BML_STRSIZE 32
 
 static void BuildModesList(int hiwidth, int hiheight)
 {
+    char current_resolution[BML_STRSIZE + 1];
+    int cur;
 
 	// gathers a list of unique resolutions availible for the current
 	// screen mode (windowed or fullscreen)
@@ -1075,7 +1087,7 @@ static void BuildModesList(int hiwidth, int hiheight)
         {
             M_Free(VidModes[i].name);
         }
-    }
+    } 
 
     // (Re)allocate the mode list
     size_t vmsSize = (menumodelist.size() * sizeof(value_t));
@@ -1091,7 +1103,7 @@ static void BuildModesList(int hiwidth, int hiheight)
     {
         VidModes[i].name = (char *)M_Calloc(1, BML_STRSIZE + 1);
 
-        snprintf((char*)VidModes[i].name, BML_STRSIZE + 1, "%dx%d", mode_it->first, 
+        snprintf((char*)VidModes[i].name, BML_STRSIZE, "%dx%d", mode_it->first, 
                  mode_it->second);
 
         // Give the resolution an integer value, it isn't used anywhere but
@@ -1103,14 +1115,27 @@ static void BuildModesList(int hiwidth, int hiheight)
     // the modes array
     ModesItems[VM_VIDLINE].b.leftval = (int)i;
     VMSize = i;
+
+    // Set the temporary cvar value to the current resolution of the screen
+    snprintf(current_resolution, BML_STRSIZE, "%dx%d", hiwidth, hiheight);
+    
+    cur = M_FindCurName (current_resolution, VidModes, VMSize);
+
+    vid_currres.Set(cur);
 }
 
 // An ugly function for getting the width and height components of the video 
 // menus temporary cvar 
 static bool GetSelectedSize(int* width, int* height)
 {
-	const char* resolution_str = VidModes[(int)vid_currres].name;
-
+	const char* resolution_str;
+    int cur = (int)vid_currres;
+	
+	if (cur > 0 && cur < VMSize)
+        resolution_str = VidModes[cur].name;
+    else
+        resolution_str = "";
+        
 	size_t xpos = 0;
 	for (const char* s = resolution_str; s; s++, xpos++)
 		if (*s == 'x' || *s == 'X')
@@ -1336,6 +1361,17 @@ int M_FindCurVal (float cur, value_t *values, int numvals)
 
 	for (v = 0; v < numvals; v++)
 		if (values[v].value == cur)
+			break;
+
+	return v;
+}
+
+int M_FindCurName (char *cur, value_t *values, int numvals)
+{
+	int v;
+
+	for (v = 0; v < numvals; v++)
+		if (!(strcasecmp(cur, values[v].name)))
 			break;
 
 	return v;
