@@ -1026,9 +1026,7 @@ static menuitem_t ModesItems[] = {
     { whitetext, "Press enter to set resolution", {NULL}, {0.0}, {0.0}, {0.0}, {NULL} },
     { whitetext, " ",                   {NULL},         {0.0}, {0.0}, {0.0}, {NULL} },
 	{ bricktext, "Adjust Video Options",{NULL},         {0.0}, {0.0}, {0.0}, {NULL} },
-#ifdef _XBOX
-	{ slider, "Overscan",				{&vid_overscan},		{0.84375}, {1.0}, {0.03125}, {NULL} },
-#else
+#if !defined(GCONSOLE)
 	{ discrete, "Fullscreen",			{&vid_fullscreen},		{2.0}, {0.0},	{0.0}, {YesNo} },
 #endif
     { discrete, "Vertical Sync",		{&vid_vsync},			{2.0}, {0.0},	{0.0}, {YesNo} },
@@ -1036,11 +1034,14 @@ static menuitem_t ModesItems[] = {
 	{ discrete,	"Widescreen",			{&vid_widescreen},		{2.0}, {0.0},	{0.0}, {YesNo} },
 	{ discrete, "32-bit color",			{&vid_32bpp},			{2.0}, {0.0},	{0.0}, {YesNo} },
 	{ discrete, "Mode Emulation",    	{&vid_scremu},			{3.0}, {0.0},	{0.0}, {VidScrEmu} },
+    { slider,   "Overscan",				{&vid_overscan},		{0.84375}, {1.0}, {0.03125}, {NULL} },
 	{ discrete, "Display FPS",			{&vid_displayfps},		{2.0}, {0.0},	{0.0}, {YesNo} },
 };
 
 // Position in the menu of the "Video Resolution" line
 #define VM_VIDLINE      0
+// Position in the menu of the "Fullscreen" line
+#define VM_FSLINE       4
 
 menu_t ModesMenu = {
 	"M_VIDMOD",
@@ -1204,19 +1205,21 @@ static void M_SlideUIBlue (int val)
 
 void M_OptInit (void)
 {
+	#if !defined(GCONSOLE)
 	switch (I_GetVideoCapabilities()->getDisplayType())
 	{
 	case DISPLAY_FullscreenOnly:
-		ModesItems[2].type = nochoice;
-		ModesItems[2].b.leftval = 1.f;
+		ModesItems[VM_FSLINE].type = nochoice;
+		ModesItems[VM_FSLINE].b.leftval = 1.f;
 		break;
 	case DISPLAY_WindowOnly:
-		ModesItems[2].type = nochoice;
-		ModesItems[2].b.leftval = 0.f;
+		ModesItems[VM_FSLINE].type = nochoice;
+		ModesItems[VM_FSLINE].b.leftval = 0.f;
 		break;
 	default:
 		break;
 	}
+	#endif
 }
 
 
