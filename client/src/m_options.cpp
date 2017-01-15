@@ -1063,13 +1063,13 @@ static void BuildModesList(int hiwidth, int hiheight)
 {
     char current_resolution[BML_STRSIZE + 1];
     int cur;
-
+	typedef std::vector< std::pair<uint16_t, uint16_t> > MenuModeList;
+	MenuModeList menumodelist;
+    MenuModeList::const_iterator mode_it;
+    
 	// gathers a list of unique resolutions availible for the current
 	// screen mode (windowed or fullscreen)
 	bool fullscreen = I_GetWindow()->getVideoMode()->isFullScreen();
-
-	typedef std::vector< std::pair<uint16_t, uint16_t> > MenuModeList;
-	MenuModeList menumodelist;
 
 	const IVideoModeList* videomodelist = I_GetVideoCapabilities()->getSupportedVideoModes();
 	for (IVideoModeList::const_iterator it = videomodelist->begin(); it != videomodelist->end(); ++it)
@@ -1077,8 +1077,6 @@ static void BuildModesList(int hiwidth, int hiheight)
 			menumodelist.push_back(std::make_pair(it->getWidth(), it->getHeight()));
 
 	menumodelist.erase(std::unique(menumodelist.begin(), menumodelist.end()), menumodelist.end());
-
-	MenuModeList::const_iterator mode_it = menumodelist.begin();
 
 	// Clear all previously allocated video mode strings (ugh)
     if (VidModes)
@@ -1099,15 +1097,15 @@ static void BuildModesList(int hiwidth, int hiheight)
     int i = 0;
     
     // Fill the mode list for our scroll left/right widget
-    for (; mode_it != menumodelist.end(); ++i, ++mode_it)
+    for (mode_it = menumodelist.begin(); mode_it != menumodelist.end(); ++i, 
+        ++mode_it)
     {
         VidModes[i].name = (char *)M_Calloc(1, BML_STRSIZE + 1);
 
         snprintf((char*)VidModes[i].name, BML_STRSIZE, "%dx%d", mode_it->first, 
                  mode_it->second);
 
-        // Give the resolution an integer value, it isn't used anywhere but
-        // I'm just making sure our "awesome" menu code doesn't have a fit
+        // Used to find the video mode
         VidModes[i].value = static_cast<float>(i);
     }
     
