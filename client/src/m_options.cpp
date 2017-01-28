@@ -988,6 +988,7 @@ menu_t AutomapMenu = {
  *
  *=======================================*/
 
+QWORD testingmode;
 int OldWidth, OldHeight;
 
 EXTERN_CVAR (vid_defwidth)
@@ -1021,9 +1022,21 @@ static value_t *VidModes = NULL;
 
 EXTERN_CVAR(vid_currres)
 
+#ifdef _XBOX
+static const char VMEnterText[] = "Press A to set mode";
+static const char VMTestText[] = "Press X to test mode for 5 seconds";
+#else
+static const char VMEnterText[] = "Press ENTER to set mode";
+static const char VMTestText[] = "Press T to test mode for 5 seconds";
+#endif
+
+static const char VMTestWaitText[] = "Please wait 5 seconds...";
+static const char VMTestBlankText[] = " ";
+
 static menuitem_t ModesItems[] = {
 	{ discrete, "Video Resolution",     {&vid_currres}, {0.0}, {0.0}, {0.0}, {NULL} },
-    { whitetext, "Press enter to set resolution", {NULL}, {0.0}, {0.0}, {0.0}, {NULL} },
+    { whitetext, VMTestText,            {NULL},         {0.0}, {0.0}, {0.0}, {NULL} },
+    { whitetext, VMEnterText,           {NULL},         {0.0}, {0.0}, {0.0}, {NULL} },
     { whitetext, " ",                   {NULL},         {0.0}, {0.0}, {0.0}, {NULL} },
 	{ bricktext, "Adjust Video Options",{NULL},         {0.0}, {0.0}, {0.0}, {NULL} },
 #if !defined(GCONSOLE)
@@ -1040,8 +1053,12 @@ static menuitem_t ModesItems[] = {
 
 // Position in the menu of the "Video Resolution" line
 #define VM_VIDLINE      0
+// Position in the menu of the "Test" line
+#define VM_TESTLINE     1
+// Position in the menu of the "Enter" line
+#define VM_ENTERLINE    2
 // Position in the menu of the "Fullscreen" line
-#define VM_FSLINE       4
+#define VM_FSLINE       5
 
 menu_t ModesMenu = {
 	"M_VIDMOD",
@@ -1152,7 +1169,42 @@ static bool GetSelectedSize(int* width, int* height)
 
 static void SetModesMenu(int w, int h)
 {
+    if (!testingmode)
+	{
+		ModesItems[VM_ENTERLINE].label = VMEnterText;
+		ModesItems[VM_TESTLINE].label = VMTestText;
+	}
+	else
+	{
+		static char enter_text[64];
+		sprintf(enter_text, "TESTING %dx%d", w, h);
+
+		ModesItems[VM_ENTERLINE].label = enter_text;
+		ModesItems[VM_TESTLINE].label = VMTestWaitText;
+	}
+
 	BuildModesList(w, h);
+}
+
+//
+// M_ModeFlashTestText
+//
+// Flashes the video mode testing text
+//
+void M_ModeFlashTestText()
+{
+    if (ModesItems[VM_TESTLINE].label[0] == ' ')
+		ModesItems[VM_TESTLINE].label = VMTestWaitText;
+	else
+		ModesItems[VM_TESTLINE].label = VMTestBlankText;
+}
+
+void M_RestoreMode (void)
+{
+	V_SetResolution(OldWidth, OldHeight);
+	testingmode = 0;
+
+	SetModesMenu(OldWidth, OldHeight);
 }
 
 static void SetVidMode()
@@ -2040,6 +2092,34 @@ void M_OptResponder (event_t *ev)
 			break;
 
 		default:
+#ifdef _XBOX
+			if (ev->data2 == 't' || ev->data2 == KEY_JOY3)
+#else
+			if (ev->data2 == 't')
+#endif
+			{
+				// Test selected resolution
+				if (CurrentMenu == &ModesMenu && item == &ModesItems[VM_VIDLINE])
+				{
+					int width, height;
+
+					if (!GetSelectedSize(&width, &height))
+					{
+						width = I_GetVideoWidth();
+						height = I_GetVideoHeight();
+					}
+
+					OldWidth = I_GetVideoWidth();
+					OldHeight = I_GetVideoHeight();
+
+					V_SetResolution(width, height);
+
+					testingmode = I_MSTime() * TICRATE / 1000 + 5 * TICRATE;
+					SetModesMenu(width, height);
+
+					S_Sound (CHAN_INTERFACE, "weapons/pistol", 1, ATTN_NONE);
+				}
+			}
 			break;
 	}
 
