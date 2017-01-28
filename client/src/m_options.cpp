@@ -1022,15 +1022,21 @@ static value_t *VidModes = NULL;
 
 EXTERN_CVAR(vid_currres)
 
+// Mode testing timeout (in seconds)
+#define VM_TESTTIMEOUT  10
+// Stringification (https://gcc.gnu.org/onlinedocs/cpp/Stringification.html)
+#define xstr(s) str(s)
+#define str(s) #s
+
 #ifdef _XBOX
 static const char VMEnterText[] = "Press A to set mode";
-static const char VMTestText[] = "Press X to test mode for 5 seconds";
+static const char VMTestText[] = "Press X to test mode for " xstr(VM_TESTTIMEOUT) " seconds";
 #else
 static const char VMEnterText[] = "Press ENTER to set mode";
-static const char VMTestText[] = "Press T to test mode for 5 seconds";
+static const char VMTestText[] = "Press T to test mode for " xstr(VM_TESTTIMEOUT) " seconds";
 #endif
 
-static const char VMTestWaitText[] = "Please wait 5 seconds...";
+static const char VMTestWaitText[] = "Please wait " xstr(VM_TESTTIMEOUT) " seconds...";
 static const char VMTestBlankText[] = " ";
 
 static menuitem_t ModesItems[] = {
@@ -2114,7 +2120,7 @@ void M_OptResponder (event_t *ev)
 
 					V_SetResolution(width, height);
 
-					testingmode = I_MSTime() * TICRATE / 1000 + 5 * TICRATE;
+					testingmode = I_MSTime() * TICRATE / 1000 + VM_TESTTIMEOUT * TICRATE;
 					SetModesMenu(width, height);
 
 					S_Sound (CHAN_INTERFACE, "weapons/pistol", 1, ATTN_NONE);
