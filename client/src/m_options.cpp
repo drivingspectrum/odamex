@@ -1112,12 +1112,15 @@ static void BuildModesList(int hiwidth, int hiheight)
     } 
 
     // (Re)allocate the mode list
-    size_t vmsSize = (menumodelist.size() * sizeof(value_t));
-    VidModes = (value_t *)M_Realloc(VidModes, vmsSize);
+    VMSize = menumodelist.size();
+    VidModes = (value_t *)M_Realloc(VidModes, 
+                                    (menumodelist.size() * sizeof(value_t)));
     
-    // Set the mode list pointer to the values
+    // Set the pointer and size so the resolution widget can switch between
+    // values
     ModesItems[VM_VIDLINE].e.values = VidModes;
-        
+    ModesItems[VM_VIDLINE].b.leftval = (int)VMSize;
+            
     int i = 0;
     
     // Fill the mode list for our scroll left/right widget
@@ -1133,11 +1136,6 @@ static void BuildModesList(int hiwidth, int hiheight)
         VidModes[i].value = static_cast<float>(i);
     }
     
-    // Set the number of video modes for the menu system and record the size of
-    // the modes array
-    ModesItems[VM_VIDLINE].b.leftval = (int)i;
-    VMSize = i;
-
     // Set the temporary cvar value to the current resolution of the screen
     snprintf(current_resolution, BML_STRSIZE, "%dx%d", hiwidth, hiheight);
     
